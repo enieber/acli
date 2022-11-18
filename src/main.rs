@@ -1,0 +1,83 @@
+use std::process::Command;
+use std::str::from_utf8;
+use terminal_menu::TerminalMenuItem;
+use terminal_menu::{button, label, menu, mut_menu, run};
+
+fn main() {
+    let menu = menu(vec![
+        label("-------------"),
+        label("Android CLI"),
+        label("use wasd or arrow keys"),
+        label("enter to select"),
+        label("'q' or esc to exit"),
+        label("-----------------------"),
+        button("Open Emulator"),
+        button("Compile Android"),
+    ]);
+    run(&menu);
+
+    if mut_menu(&menu).canceled() {
+        println!("End..")
+    } else {
+        let item_selected = mut_menu(&menu).selected_item_name().to_string();
+        match item_selected.as_ref() {
+            "Open Emulator" => {
+                emulator();
+            }
+            "Compile Android" => {
+                println!("Compile Android");
+            }
+            _ => println!("fail"),
+        }
+    }
+}
+
+fn emulator() {
+    println!("Emulators");
+    let emulators = Command::new("emulator").arg("-list-avds").output();
+    match emulators {
+        Ok(emulator_list) => {
+            let list_str = from_utf8(&emulator_list.stdout).unwrap();
+            let list: Vec<&str> = list_str.split("/n").collect();
+
+            let mut men = vec![
+                label("----------------------"),
+                label("Emulators"),
+                label("use wasd or arrow keys"),
+                label("enter to select"),
+                label("'q' or esc to exit"),
+                label("-----------------------"),
+            ];
+
+            for emulator in list {
+                let emulator_str = emulator.replace("_", " ");
+                let item = format!("{}", emulator_str);
+                men.push(button(item));
+            }
+
+            let menu = menu(men);
+            run(&menu);
+
+            if mut_menu(&menu).canceled() {
+                println!("End..")
+            } else {
+                let item_selected = mut_menu(&menu).selected_item_name().to_string();
+
+                println!("Selected: {:?}", &item_selected);
+
+                Command::new("emulator")
+                    .arg("-netdelay")
+                    .arg("none")
+                    .arg("-netspeed")
+                    .arg("full")
+                    .arg("-avd")
+                    .arg(&item_selected.replace("\n", "").replace(" ", "_"))
+                    .spawn()
+                    .expect("failed to execute process");
+            }
+        }
+        Err(err) => {
+            println!("Error to running emulator: {:?}", err);
+        }
+    }
+}
