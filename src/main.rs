@@ -1,4 +1,5 @@
-use std::process::Command;
+use std::process::exit;
+use std::process::{Command, Stdio};
 use std::str::from_utf8;
 use terminal_menu::TerminalMenuItem;
 use terminal_menu::{button, label, menu, mut_menu, run};
@@ -13,6 +14,7 @@ fn main() {
         label("-----------------------"),
         button("Open Emulator"),
         button("Compile Android"),
+        button("debug"),
     ]);
     run(&menu);
 
@@ -25,11 +27,58 @@ fn main() {
                 emulator();
             }
             "Compile Android" => {
-                println!("Compile Android");
+                compile_android();
+            }
+            "debug" => {
+                build_apk_path();
             }
             _ => println!("fail"),
         }
     }
+}
+
+fn compile_android() {
+    println!("Compile with gradle");
+    Command::new("gradle").arg("build").status();
+    install_app();
+}
+
+fn install_app() {
+    println!("Install app");
+    Command::new("gradle").arg("installDebug").status();
+}
+
+fn open_app() {
+    println!("Open app installed");
+    let apk_path = build_apk_path();
+    Command::new("adb")
+        .arg("shell")
+        .arg("am")
+        .arg("start")
+        .arg("-n")
+        .arg(&apk_path)
+        .status();
+}
+
+fn build_apk_path() -> String {
+    let path = "app/build/outputs/apk/debug/app-debug.apk";
+    //aapt2 dump packagename
+    let dump_apk = Command::new("aapt2")
+        .arg("dump")
+        .arg("packagename")
+        .arg(&path)
+        .output();
+    let value = dump_apk.unwrap().stdout;
+    let list_str = from_utf8(&value).unwrap().to_string();
+    let val = format!("-v 1 -p {}", &list_str);
+
+    Command::new("adb").args(["shell", "monkey", &val]).status();
+
+    //package=$(aapt dump badging $apk_path | awk '/package/{gsub("name=|'"'"'","");  print $2}')
+    //activity=$(aapt dump badging $apk_path | awk '/launchable-activity/{gsub("name=|'"'"'","");  print $2}')
+
+    //echo "$package/$activity"
+    return String::from("");
 }
 
 fn emulator() {
@@ -72,7 +121,7 @@ fn emulator() {
                     .arg("full")
                     .arg("-avd")
                     .arg(&item_selected.replace("\n", "").replace(" ", "_"))
-                    .spawn()
+                    .status()
                     .expect("failed to execute process");
             }
         }
